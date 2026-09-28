@@ -1,0 +1,40 @@
+name: Wake home PC
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [wake_pc]
+
+permissions: {}
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send WoL magic packet
+        env:
+          WOL_HOST: ${{ secrets.WOL_HOST }}
+          WOL_PORT: ${{ secrets.WOL_PORT }}
+          WOL_MAC: ${{ secrets.WOL_MAC }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          import socket
+
+          host = os.environ["WOL_HOST"].strip()
+          port = int(os.environ["WOL_PORT"])
+          mac = re.sub(r"[^0-9a-fA-F]", "", os.environ["WOL_MAC"])
+
+          if not host or not 1 <= port <= 65535:
+              raise ValueError("Check WOL_HOST and WOL_PORT")
+          if not re.fullmatch(r"[0-9a-fA-F]{12}", mac):
+              raise ValueError("Check WOL_MAC")
+
+          packet = b"\xff" * 6 + bytes.fromhex(mac) * 16
+
+          with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+              sock.sendto(packet, (host, port))
+
+          print("UDP magic packet sent. PC startup is not confirmed.")
+          PY
